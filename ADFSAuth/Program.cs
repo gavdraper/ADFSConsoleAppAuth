@@ -15,8 +15,12 @@ namespace ADFSAuth
     {
         static void Main()
         {
-            //Setup the connection to ADFS, with the WS-Trust 13 Windows Mixed endpoint
-            var factory = new WSTrustChannelFactory(new WindowsWSTrustBinding(SecurityMode.TransportWithMessageCredential), new EndpointAddress("https://dcadfs.security.net/adfs/services/trust/13/windowsmixed"))
+            const string relyingPartyId = "https://dcadfs.security.net/adfs/gav"; //ID of the relying party in AD FS
+            const string adfsEndpoint = "https://dcadfs.security.net/adfs/services/trust/13/windowsmixed";
+            const string certificateThumbPrint = "4880bfd77c1a87f9c7256be9900f55ba09317cbb";
+
+            //Setup the connection to ADFS
+            var factory = new WSTrustChannelFactory(new WindowsWSTrustBinding(SecurityMode.TransportWithMessageCredential), new EndpointAddress(adfsEndpoint))
             {
                 TrustVersion = TrustVersion.WSTrust13
             };
@@ -26,7 +30,7 @@ namespace ADFSAuth
             {
                 RequestType = RequestTypes.Issue,
                 KeyType = KeyTypes.Bearer,
-                AppliesTo = new EndpointReference("https://dcadfs.security.net/adfs/gav") //This is the ID you specified for your relying party in ADFS
+                AppliesTo = new EndpointReference(relyingPartyId)
             };
 
             //Open a connection to ADFS and get a token for the logged in user
@@ -36,11 +40,12 @@ namespace ADFSAuth
             if (genericToken != null)
             {
                 //Setup the handlers needed to convert the generic token to a SAML Token
-                var thumbPrintValidator = new ConfigurationBasedIssuerNameRegistry();
-                thumbPrintValidator.ConfiguredTrustedIssuers.Add(new System.Collections.Generic.KeyValuePair<string, string>("4880bfd77c1a87f9c7256be9900f55ba09317cbb", "‎Certificate ThumbPrint"));
-
                 var tokenHandlers = new SecurityTokenHandlerCollection(new SecurityTokenHandler[] { new SamlSecurityTokenHandler() });
-                tokenHandlers.Configuration.AudienceRestriction = new AudienceRestriction() { AudienceMode = System.IdentityModel.Selectors.AudienceUriMode.Never };
+                tokenHandlers.Configuration.AudienceRestriction = new AudienceRestriction();
+                tokenHandlers.Configuration.AudienceRestriction.AllowedAudienceUris.Add(new Uri(relyingPartyId));
+
+                var thumbPrintValidator = new ConfigurationBasedIssuerNameRegistry();
+                thumbPrintValidator.ConfiguredTrustedIssuers.Add(new System.Collections.Generic.KeyValuePair<string, string>(certificateThumbPrint, "‎Certificate ThumbPrint"));
                 tokenHandlers.Configuration.IssuerNameRegistry = thumbPrintValidator;
                 //Swap above line for this one to use the custom TrustedIssuerNameRegistry class below this gives you more flexability to customize the authentication of the issuer
                 //tokenHandlers.Configuration.IssuerNameRegistry = thumbPrintValidator;
@@ -63,7 +68,6 @@ namespace ADFSAuth
 
         //The token handler calls this to check the token is from a trusted issuer before converting it to a claims principal
         //In this case I authenticate this by checking the certificate name used to sign the token
-        //TODO : Should probably do more than just check the certificate name. I think the relying party has a uniqe thumbprint in AD FS
         public class TrustedIssuerNameRegistry : IssuerNameRegistry
         {
             public override string GetIssuerName(SecurityToken securityToken)
