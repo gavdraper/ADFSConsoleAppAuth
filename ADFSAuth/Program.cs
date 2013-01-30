@@ -15,7 +15,7 @@ namespace ADFSAuth
     {
         static void Main()
         {
-            //Setup the connection to ADFS
+            //Setup the connection to ADFS, with the WS-Trust 13 Windows Mixed endpoint
             var factory = new WSTrustChannelFactory(new WindowsWSTrustBinding(SecurityMode.TransportWithMessageCredential), new EndpointAddress("https://dcadfs.security.net/adfs/services/trust/13/windowsmixed"))
             {
                 TrustVersion = TrustVersion.WSTrust13
@@ -26,7 +26,7 @@ namespace ADFSAuth
             {
                 RequestType = RequestTypes.Issue,
                 KeyType = KeyTypes.Bearer,
-                AppliesTo = new EndpointReference("https://dcadfs.security.net/adfs/gav")
+                AppliesTo = new EndpointReference("https://dcadfs.security.net/adfs/gav") //This is the ID you specified for your relying party in ADFS
             };
 
             //Open a connection to ADFS and get a token for the logged in user
